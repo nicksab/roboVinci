@@ -1,60 +1,39 @@
-#!/usr/bin/python
-#+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-#|R|a|s|p|b|e|r|r|y|P|i|-|S|p|y|.|c|o|.|u|k|
-#+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-#
-# ultrasonic_1.py
-# Measure distance using an ultrasonic module
-#
-# Author : Matt Hawkins
-# Date   : 09/01/2013
+#! /usr/bin/python
 
-# Import required Python libraries
+import sys
 import time
-import RPi.GPIO as GPIO
+import pigpio
 
-# Use BCM GPIO references
-# instead of physical pin numbers
-GPIO.setmode(GPIO.BCM)
-
-# Define GPIO to use on Pi
 GPIO_TRIGGER = 14
 GPIO_ECHO = 15
 
-print "Ultrasonic Measurement"
+def read_ultrasonic():
+    pigpio.gpio_trigger(GPIO_TRIGGER)
+    stop = start = time.time()
+    while pigpio.read(GPIO_ECHO) == 0:
+        start = time.time()
+    while pigpio.read(GPIO_ECHO) == 1:
+        stop = time.time()
+    elapsed = stop - start
+    distance = elapsed * 34000
+    distance = distance / 2
+    return distance    
 
-# Set pins as output and input
-GPIO.setup(GPIO_TRIGGER,GPIO.OUT)  # Trigger
-GPIO.setup(GPIO_ECHO,GPIO.IN)      # Echo
+def main(argv=sys.argv):
+    pigpio.stop()
+    time.sleep(0.5)
+    pigpio.start()
 
-# Set trigger to False (Low)
-GPIO.output(GPIO_TRIGGER, False)
+    pigpio.set_mode(GPIO_TRIGGER, pigpio.OUTPUT)
+    pigpio.set_mode(GPIO_ECHO, pigpio.INPUT)
+    pigpio.write(GPIO_TRIGGER, 0)
+    time.sleep(0.5)
 
-# Allow module to settle
-time.sleep(0.5)
+    distance = read_ultrasonic()
+    print "Distance : %.1f" % (distance,)
 
-# Send 10us pulse to trigger
-GPIO.output(GPIO_TRIGGER, True)
-time.sleep(0.00001)
-GPIO.output(GPIO_TRIGGER, False)
-start = time.time()
-while GPIO.input(GPIO_ECHO)==0:
-  start = time.time()
+    pigpio.stop()
+    return 0
 
-while GPIO.input(GPIO_ECHO)==1:
-  stop = time.time()
-
-# Calculate pulse length
-elapsed = stop-start
-
-# Distance pulse travelled in that time is time
-# multiplied by the speed of sound (cm/s)
-distance = elapsed * 34000
-
-# That was the distance there and back so halve the value
-distance = distance / 2
-
-print "Distance : %.1f" % distance
-
-# Reset GPIO settings
-GPIO.cleanup()
+if __name__ == '__main__':
+    sys.exit(main())
