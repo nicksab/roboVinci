@@ -16,11 +16,11 @@ class Ultrasonic(object):
         self._start()
 
     def _start(self):
-        pigpio.set_mode(pins.US_TRIGGER, pigpio.OUTPUT)
-        pigpio.set_mode(pins.US_ECHO, pigpio.INPUT)
-        pigpio.write(pins.US_TRIGGER, 0)
+        pigpio.set_mode(pins.ULTRASONIC_TRIGGER, pigpio.OUTPUT)
+        pigpio.set_mode(pins.ULTRASONIC_ECHO, pigpio.INPUT)
+        pigpio.write(pins.ULTRASONIC_TRIGGER, 0)
         self._echo_cb = pigpio.callback(
-            pins.US_ECHO, pigpio.EITHER_EDGE, self._on_echo)
+            pins.ULTRASONIC_ECHO, pigpio.EITHER_EDGE, self._on_echo)
 
     def __del__(self):
         cb = self._echo_cb
@@ -40,7 +40,7 @@ class Ultrasonic(object):
 
     def _finish_echo(self, distance):
         try:
-            pigpio.set_watchdog(pins.US_ECHO, 0)
+            pigpio.set_watchdog(pins.ULTRASONIC_ECHO, 0)
             self._cv.acquire()
             self._state = self.STATE_QUIET
             self._distance = distance
@@ -50,7 +50,7 @@ class Ultrasonic(object):
 
     def _activate(self):
         self._state = self.STATE_ACTIVE
-        pigpio.gpio_trigger(pins.US_TRIGGER)
+        pigpio.gpio_trigger(pins.ULTRASONIC_TRIGGER)
 
     def measure(self):
         distance = -1.0
