@@ -1,0 +1,219 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+# RoboVinci test code
+# FIRST SUCCESSFUL AUTONOMOUS CODE -- 3/2/2014
+# Using Bump Sensor to stop, back up, turn right, and continue
+
+
+print "Starting up..."
+
+import RPi.GPIO as gpio
+import time
+import threading
+
+
+gpio.setmode(gpio.BOARD)    #Set pins to BOARD numbering
+
+# G L O B A L   V A R I A B L E S
+currDir = "f"
+
+#Speed variables
+
+MAX_SPEED = 100
+HIGH_SPEED = 80
+AVG_SPEED = 25
+LOW_SPEED = 10
+MIN_SPEED = 5
+OFF_SPEED = 0
+
+bumpID = 1
+
+
+# H B R I D G E   C O N T R O L L E R
+
+#H-Bridge Pin Connections for Left/Right motor
+leftFwdPin = 18  #Left forward pin  -- IN1
+leftRevPin = 16  #Left reverse pin -- IN2
+leftSpeedPin = 22  #Left speed control pin (PWM) -- ENA
+
+rightFwdPin = 11  #Right foward pin -- IN3
+rightRevPin = 13  #Right reverse pin -- IN4
+rightSpeedPin = 15  #Right speed control pin (PWM) -- ENB
+
+gpio.setup(leftFwdPin,gpio.OUT)    #Set pins to output mode
+gpio.setup(leftRevPin,gpio.OUT)
+gpio.setup(leftSpeedPin,gpio.OUT)
+
+gpio.setup(rightFwdPin,gpio.OUT)    
+gpio.setup(rightRevPin,gpio.OUT)
+gpio.setup(rightSpeedPin,gpio.OUT)
+
+pwmFreq = 50   #Set PWM frequency to x. (Also affects speed?)
+
+lCurrSp = gpio.PWM(leftSpeedPin, pwmFreq)  #Create speed controls and set to PWM w frez x
+rCurrSp = gpio.PWM(rightSpeedPin, pwmFreq)
+
+### M A I N   F U N C T I O N S
+
+def fullStop():
+  print "fullStop"
+  gpio.output(leftFwdPin, False)
+  gpio.output(rightFwdPin, False)
+  gpio.output(leftRevPin, False)
+  gpio.output(rightRevPin, False)
+
+  lCurrSp.start(0)
+  rCurrSp.start(0)
+
+def startSpeed(newSpeed):
+  #print "startSpeed: " + str(newSpeed)
+  lCurrSp.start(newSpeed) 
+  rCurrSp.start(newSpeed+5)
+
+def newDirection(newDir):
+  print "newDir: " + newDir
+  #fullStop()
+  
+  if newDir == "f":
+      gpio.output(leftFwdPin, True) 
+      gpio.output(rightFwdPin, True)
+  elif newDir == "r":
+      gpio.output(leftFwdPin, True)
+      gpio.output(rightRevPin, True)
+  elif newDir == "l":
+      gpio.output(leftRevPin, True) 
+      gpio.output(rightFwdPin, True)
+  elif newDir == "v":
+      gpio.output(leftRevPin, True) 
+      gpio.output(rightRevPin, True)
+
+  print "Done newDir"
+
+def pivot(thisDir):
+  global AVG_SPEED
+
+  print "Pivot"
+
+  startSpeed(AVG_SPEED)
+  newDirection(thisDir)
+ 
+  time.sleep(0.5)
+  fullStop()
+  print "Done pivot"
+
+def bump_detected(channel):  #channel = pin
+  global b_BumpStatus
+  global time_stamp #Debounce
+
+  if b_BumpStatus == False:
+    b_BumpStatus = True
+    print "XXX     B U M P      XXX"
+    time_now = time.time()              #Debounce
+    if (time_now - time_stamp) >= 0.3:  #Debounce
+        
+      # Create new threads   ##### THREADING TEST
+      currBump = bump(bumpID, "BumpThread", bumpID)
+      # Start new Threads
+      currBump.start()
+      
+    time_stamp = time_now   #Debounce
+    print "Done bump detected"
+  else:
+    print "Bump detect, but not reacting."
+
+ ##### THREADING TEST
+
+class bump (threading.Thread):
+  def __init__(self, threadID, name, counter):
+    global bumpID
+    
+    print "Init bump " + str(bumpID)
+    threading.Thread.__init__(self)
+    self.threadID = threadID
+    self.name = name
+    self.counter = counter
+    bumpID += 1
+    
+  def run(self):
+
+    global AVG_SPEED
+    global b_BumpStatus
+    
+    #print "Bump react -----> "
+
+    #STOP
+    fullStop()
+    time.sleep(1) # pause for 1 second
+
+    #BACKUP
+    
+    startSpeed(AVG_SPEED)
+    newDirection("v")
+    time.sleep(1)
+
+    #STOP
+    fullStop()
+
+    time.sleep(0.25)
+
+    #PIVOT RIGHT
+    pivot("r")
+    time.sleep(0.5)
+    
+    #RESUME FORWARD
+
+    startSpeed(AVG_SPEED)
+    newDirection("f")
+
+    
+    b_BumpStatus = False
+
+    print "-----> Done bump react "
+
+
+#  B U M P   S W I T C H
+print "Bump switch setup"
+time_stamp = time.time() #Debounce
+
+b_BumpStatus = False
+
+swBump = 26 #BCM = 7
+gpio.setup(swBump,gpio.IN) #Set to input
+
+gpio.add_event_detect(swBump, gpio.RISING, callback=bump_detected)
+  
+## INITIALIZE
+
+print "Initializing..."
+
+currDir = "f"
+fullStop()
+
+print "Ready -- Set -- "
+
+startSpeed(AVG_SPEED)
+newDirection(currDir)
+
+print ">>> GO!"
+
+## M A I N   L O O P
+
+try:
+  while True:
+        # print ">>> Move? f, l, r, v,d"
+        # keyIn = raw_input()  #for manual override
+        print "Loop: " + str(time.time())
+        time.sleep(1)
+        
+except KeyboardInterrupt:    #Stop on keyboard interrupt, control-C
+    
+    print ">>> Stopped <<<"
+    fullStop()
+
+finally:    
+    gpio.cleanup()
+
+    
+print "DONE"
+
